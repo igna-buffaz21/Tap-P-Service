@@ -1,10 +1,18 @@
+
 import pandas as pd
+
+FIRST_WEEK = pd.Timestamp("2013-01-07")
+LAST_WEEK = pd.Timestamp("2017-08-07")
+TRAIN_RATIO = 0.8
+
+WEEKS = pd.date_range(FIRST_WEEK, LAST_WEEK, freq="W-MON")
+TEST_START = WEEKS[int(len(WEEKS) * TRAIN_RATIO)]
 
 
 def prepare_weekly_sales(
     df: pd.DataFrame, #df = respuesta de la base de datos
     min_active_weeks: int = 40, #número mínimo de semanas activas que debe tener un producto para ser incluido
-    train_ratio: float = 0.8, #porcentaje de datos que vamos a usar para entrenar el modelo, el resto se usa para testearlo
+    train_ratio: float = TRAIN_RATIO, #porcentaje de datos que vamos a usar para entrenar el modelo, el resto se usa para testearlo
 ) -> pd.DataFrame:
     """Prepara series semanales continuas por producto y sucursal."""
 
@@ -23,16 +31,16 @@ def prepare_weekly_sales(
     data["week_start"] = pd.to_datetime(data["week_start"])
     data["units_sold"] = pd.to_numeric(data["units_sold"])
 
-    # El dataset reconstruido abarca del 01/01/2023 al 11/12/2024.
+    # El dataset Corporación Favorita abarca del 01/01/2013 al 15/08/2017.
     # Conservamos únicamente semanas completas (lunes a domingo).
-    first_week = pd.Timestamp("2023-01-02")
-    last_week = pd.Timestamp("2024-12-02")
+    first_week = FIRST_WEEK
+    last_week = LAST_WEEK
 
     data = data[
-        data["week_start"].between(first_week, last_week) #aca filtramos las semanas que queremos conservar, entre el 01/01/2023 y el 11/12/2024
+        data["week_start"].between(first_week, last_week) #aca filtramos las semanas que queremos conservar, entre el 07/01/2013 y el 07/08/2017
     ]
 
-    weeks = pd.date_range(first_week, last_week, freq="W-MON") #aca generamos todas las semanas entre el 01/01/2023 y el 11/12/2024, con frecuencia semanal, empezando los lunes
+    weeks = pd.date_range(first_week, last_week, freq="W-MON") #aca generamos todas las semanas entre el 07/01/2013 y el 07/08/2017, con frecuencia semanal, empezando los lunes
 
     # La selección se hace usando solamente el período de entrenamiento.
     train_weeks = int(len(weeks) * train_ratio)
@@ -74,6 +82,27 @@ def prepare_weekly_sales(
         .reindex(full_index, fill_value=0)
         .reset_index()
     )
+
+    # Identificamos la primera semana registrada de cada producto y sucursal.
+    first_sales = (
+        data.groupby(["branch_id", "product_id"])["week_start"]
+        .min()
+        .rename("first_sale_week")
+    )
+
+    # Agregamos esa fecha a cada registro.
+    result = result.join(
+        first_sales,
+        on=["branch_id", "product_id"]
+    )
+
+    # Eliminamos las semanas anteriores a la primera venta registrada.
+    result = result[
+        result["week_start"] >= result["first_sale_week"]
+    ].copy()
+
+    # Eliminamos la columna auxiliar.
+    result = result.drop(columns=["first_sale_week"])
 
     result["units_sold"] = result["units_sold"].astype(float)
 

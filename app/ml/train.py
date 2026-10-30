@@ -9,9 +9,12 @@ from app.ml.preprocessing import prepare_weekly_sales
 from app.ml.features import build_features
 from sklearn.tree import export_text
 
+from app.ml.preprocessing import prepare_weekly_sales, TEST_START
+
 
 #variables de entrada para el entrenamiento
 FEATURE_COLUMNS = [
+    "product_id",
     "sales_lag_1",
     "sales_lag_2",
     "sales_lag_3",
@@ -27,12 +30,32 @@ def train_regressor():
     # obtiene la data, y los procesa 
     df = get_weekly_sales(BUSINESS_ID)
     prepared = prepare_weekly_sales(df)
+
+
+    first_sales = (
+    df.groupby(["branch_id", "product_id"])["week_start"]
+    .min()
+    .rename("first_sale_week")
+    )
+
+    check = prepared.join(
+        first_sales,
+        on=["branch_id", "product_id"]
+    )
+
+    artificial_zeros = (
+        (check["units_sold"] == 0)
+        & (check["week_start"] < check["first_sale_week"])
+    )
+
+    print(
+        "Ceros anteriores a la primera venta:",
+        artificial_zeros.sum()
+    )
+
     data = build_features(prepared)
 
-    # Separar cronológicamente (80% / 20%).
-    weeks = sorted(prepared["week_start"].unique()) #aca se genera una lista con todas las semanas que tenemos en la data, ordenadas de menor a mayor
-    split_index = int(len(weeks) * 0.8) #aca se calcula el índice de la semana que divide el 80% de las semanas para entrenamiento y el 20% para prueba
-    test_start = weeks[split_index] #aca se obtiene la semana que marca el inicio del período de prueba, es decir, la primera semana que se usará para evaluar el modelo
+    test_start = TEST_START
 
     train = data[data["week_start"] < test_start] #con esta data se entrena el modelo
     test = data[data["week_start"] >= test_start] #con esta data se evalua el modelo
@@ -47,6 +70,18 @@ def train_regressor():
     X_test = test[FEATURE_COLUMNS] #variables de entrada
     y_test = test["units_sold"] #ventas reales
 
+    print(
+    "Porcentaje de semanas sin ventas (train):",
+    round((train["units_sold"] == 0).mean() * 100, 2),
+    "%"
+    )
+
+    print(
+        "Porcentaje de semanas sin ventas (test):",
+        round((test["units_sold"] == 0).mean() * 100, 2),
+        "%"
+    )
+
     
     model = DecisionTreeRegressor(
         max_depth=8, #Profundida maxima
@@ -60,7 +95,8 @@ def train_regressor():
     tree_rules = export_text(
         model,
         feature_names=FEATURE_COLUMNS,
-        decimals=2
+        decimals=2,
+        max_depth=3,
     )
 
     print("\nÁRBOL DE DECISIÓN:")
