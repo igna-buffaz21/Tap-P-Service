@@ -1,13 +1,13 @@
 
 import pandas as pd
 
-from app.database import get_connection
-from app.ml.preprocessing import TEST_START
+from app.database import get_connection_tap1
+from app.ml.sales_preprocessing import TEST_START
 
 
 def get_weekly_sales(
     business_id: int,
-    branch_id: int = 44,
+    branch_id: int,
     product_limit: int = 100,
 ) -> pd.DataFrame:
     """Obtiene ventas semanales de los productos más vendidos de una sucursal."""
@@ -36,7 +36,7 @@ def get_weekly_sales(
     # información del período de evaluación.
     selection_end_date = TEST_START.date()
 
-    with get_connection() as conn:
+    with get_connection_tap1() as conn:
         with conn.cursor() as cur:
             # Verificar que la sucursal pertenezca al negocio.
             cur.execute(

@@ -5,11 +5,11 @@ from sklearn.metrics import mean_absolute_error
 
 from app.config import BUSINESS_ID
 from app.data.sales_repository import get_weekly_sales
-from app.ml.preprocessing import prepare_weekly_sales
-from app.ml.features import build_features
+from app.ml.sales_preprocessing import prepare_weekly_sales
+from app.ml.sales_features import build_features
 from sklearn.tree import export_text
 
-from app.ml.preprocessing import prepare_weekly_sales, TEST_START
+from app.ml.sales_preprocessing import prepare_weekly_sales, TEST_START
 
 
 #variables de entrada para el entrenamiento
@@ -24,11 +24,11 @@ FEATURE_COLUMNS = [
 ]
 
 
-def train_regressor():
+def train_regressor(branch_id: int):
     """Entrena y evalúa un árbol de regresión de ventas semanales."""
 
     # obtiene la data, y los procesa 
-    df = get_weekly_sales(BUSINESS_ID)
+    df = get_weekly_sales(BUSINESS_ID, branch_id=branch_id)
     prepared = prepare_weekly_sales(df)
 
 
@@ -99,9 +99,6 @@ def train_regressor():
         max_depth=3,
     )
 
-    print("\nÁRBOL DE DECISIÓN:")
-    print(tree_rules)
-
     # 5. Predecir las ventas de las semanas de prueba.
     predictions = model.predict(X_test)
 
@@ -136,4 +133,11 @@ def train_regressor():
 
 
 if __name__ == "__main__":
-    train_regressor()
+    while True:
+        try:
+            branch_id = int(input("Ingresa la sucursal a analizar (44, 45, 47, 3, 46): "))
+            break
+        except ValueError:
+            print("Por favor, ingresa un número entero.")
+
+    train_regressor(branch_id)

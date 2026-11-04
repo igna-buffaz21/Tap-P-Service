@@ -1,7 +1,7 @@
 
 import pandas as pd
 
-from app.database import get_connection
+from app.database import get_connection_tap2
 
 
 def get_customer_purchases(business_id: int) -> pd.DataFrame:
@@ -21,7 +21,7 @@ def get_customer_purchases(business_id: int) -> pd.DataFrame:
         ORDER BY s.customer_id, s.created_at
     """
 
-    with get_connection() as conn:
+    with get_connection_tap2() as conn:
         with conn.cursor() as cur:
             cur.execute(query, (business_id,))
             rows = cur.fetchall()
